@@ -21,32 +21,45 @@
   <ItemGroup>
     <ClInclude Include="back.h" />
     <ClInclude Include="ball.h" />
-    <ClInclude Include="boss.h" />
+    <ClInclude Include="chara.h" />
     <ClInclude Include="control.h" />
+    <ClInclude Include="damage.h" />
     <ClInclude Include="define.h" />
-    <ClInclude Include="effect_edead.h" />
-    <ClInclude Include="effect_pdead.h" />
     <ClInclude Include="enemy.h" />
-    <ClInclude Include="graze.h" />
-    <ClInclude Include="item.h" />
+    <ClInclude Include="GameKeyConfig.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="player.h" />
-    <ClInclude Include="score.h" />
+    <ClInclude Include="SceneBase.h" />
+    <ClInclude Include="SceneChanger.h" />
+    <ClInclude Include="SceneConfigKey.h" />
+    <ClInclude Include="SceneGame.h" />
+    <ClInclude Include="SceneGameOver.h" />
+    <ClInclude Include="SceneMgr.h" />
+    <ClInclude Include="SceneTitle.h" />
+    <ClInclude Include="se.h" />
+    <ClInclude Include="System.h" />
+    <ClInclude Include="Task.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="back.cpp" />
     <ClCompile Include="ball.cpp" />
-    <ClCompile Include="boss.cpp" />
+    <ClCompile Include="chara.cpp" />
     <ClCompile Include="control.cpp" />
-    <ClCompile Include="effect_edead.cpp" />
-    <ClCompile Include="effect_pdead.cpp" />
+    <ClCompile Include="damage.cpp" />
     <ClCompile Include="enemy.cpp" />
-    <ClCompile Include="graze.cpp" />
-    <ClCompile Include="item.cpp" />
+    <ClCompile Include="GameKeyConfig.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="player.cpp" />
-    <ClCompile Include="score.cpp" />
+    <ClCompile Include="SceneBase.cpp" />
+    <ClCompile Include="SceneChanger.cpp" />
+    <ClCompile Include="SceneConfigKey.cpp" />
+    <ClCompile Include="SceneGame.cpp" />
+    <ClCompile Include="SceneGameOver.cpp" />
+    <ClCompile Include="SceneMgr.cpp" />
+    <ClCompile Include="SceneTitle.cpp" />
+    <ClCompile Include="se.cpp" />
+    <ClCompile Include="System.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -107,7 +120,9 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>G:\DxLib\DxLib_VC\プロジェクトに追加すべきファイル_VC用</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>G:\DxLib\DxLib_VC\プロジェクトに追加すべきファイル_VC用</AdditionalLibraryDirectories>
@@ -119,7 +134,12 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>G:\DxLib\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>G:\DxLib\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -146,10 +166,13 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>G:\DxLib\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>G:\DxLib\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

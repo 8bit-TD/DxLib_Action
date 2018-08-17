@@ -1,645 +1,209 @@
 #include "pch.h"
 #include "control.h"
 
-CONTROL::CONTROL()
-{
-	player = new PLAYER;
+CONTROL::CONTROL(){
 
+}
+
+void CONTROL::Create() {
+	gameover_flag = false; //ゲームオーバーフラグ
+	death_count = 0;       //プレイヤーが死んだ後のカウント
+	game_mode = GAME;//ゲームモード設定
 	back = new BACK;
+	//enemy_num = GetRand(190)+10;//敵の数
+	enemy_num = 100;
+	enemy = new ENEMY_MANAGER(enemy_num, GetBlankBlock());//敵作成(敵の数, 空いているブロックの配列)
+	std::string ch_file = "images/ch/ch_01.png";
+	int px = (GAME_WIDTH / 2); int py = (GAME_HEIGHT - BLOCK_SIZE * 3);
+	player = new PLAYER(
+		ch_file,//画像
+		px,//x座標
+		py,//y座標 
+		32,//w解像度
+		32,//h解像度
+		16,//キャラクターすり抜け用のサイズ
+		1, //向いている方向
+		2, //スピード
+		8, //ジャンプ
+		500,//maxhp
+		500//maxmp
+	);
+	ball = new BALL_MANAGER;
+	damage = new DAMAGE_MANAGER;
+}
 
-	//エフェクトクラスのインスタンス生成
-	for (int i = 0; i < EFFECT_EDEADNUM; ++i) {
-		effect_edead[i] = new EFFECT_EDEAD;
-	}
+void CONTROL::GetEnemyPos(std::vector<VECTOR> *ep) {//敵座標の動的配列を取得
+	enemy->GetEnemyPos(ep);
+}
 
-	//グレイズのインスタンス生成
-	for (int i = 0; i < GRAZE_NUM; ++i) {
-		graze[i] = new GRAZE;
-	}
+void CONTROL::GetBallPos(std::vector<VECTOR> *bp) {//弾の位置を取得
+	ball->GetBallPos(bp);
+}
 
-	score = new SCORE;
-	//アイテムクラスのインスタンス生成
-	for (int i = 0; i < ITEM_NUM; ++i) {
-		item[i] = new ITEM;
+void CONTROL::SetPlayerBall(double x, double y, int width, int height, int mouse_x, int mouse_y) {//プレイヤーの弾パラメータ設定
+	ball->SetBall(x, y, width, height, mouse_x, mouse_y);
+}
+
+int CONTROL::GetBlockFlag(double x, double y) {//ブロックがあるかどうかの判定
+	return back->GetBlockFlag(x, y);
+}
+
+int CONTROL::CheckMove(double x, double y, double *move_x, double *move_y, int size, int offset, bool adjust) {//移動できるか判定
+	return back->GetBlockContact(x, y, move_x, move_y, size, offset, adjust);
+}
+
+void CONTROL::GetMousePos(int *x, int *y) {//マウス座標を取得
+	GetMousePoint(x, y);
+}
+
+void CONTROL::GetPlayerPos(double *x, double *y) {//プレイヤー座標を取得
+	player->GetPlayerPos(x, y);
+}
+
+void CONTROL::SetEnemyDamage(int index, int damage) {//敵にダメージを設定
+	enemy->SetDamage(index, damage);
+}
+
+bool CONTROL::GameEndCheck() {//ゲームの終了判定
+	if (key[KEY_INPUT_F4] == 1) {
+		return true;//ESCキーを押したらゲーム終了
 	}
+	return false;
+}
+
+std::vector<double> CONTROL::GetBlankBlock() { return back->GetBlankBlock(); }//空いているブロックを返す
+
+void CONTROL::FpsTimeFanction() {// フレームレートを算出
+	SetFontSize(13);
+	if (FpsTime_i == 0)
+		FpsTime[0] = GetNowCount();               //1周目の時間取得
+	if (FpsTime_i == 49) {
+		FpsTime[1] = GetNowCount();               //50周目の時間取得
+		Fps = 1000.0f / ((FpsTime[1] - FpsTime[0]) / 50.0f);//測定した値からfpsを計算
+		FpsTime_i = 0;//カウントを初期化
+	} else
+		FpsTime_i++;//現在何周目かカウント
+	if (Fps != 0)
+		DrawFormatString(GAME_WIDTH - 70, GAME_HEIGHT - 20, GetColor(255,255,255), "FPS %.1f", Fps); //fpsを表示
+	return;
+}
+
+void CONTROL::GetPlayerHP(int *Hp, int *Maxhp) {//プレイヤーのhpを取得
+	player->GetPlayerHP(Hp, Maxhp);
+}
+
+int CONTROL::GetEnemyNum() {//敵の数を取得
+	return enemy->GetEnemyNum();
+}
+
+int CONTROL::GetBallNum() {//弾の数を取得
+	return ball->GetBallNum();
+}
+
+void CONTROL::ShowDamage(VECTOR p, int d, int col) {
+	damage->SetDamage(p, d, col);
+}
+
+void CONTROL::CheckAttackContact() {//攻撃の接触判定
+	for (int e = 0; e < enemy_num; ++e) {//敵のプレイヤーの弾の接触判定
+		if (enemy->GetDeathFlag(e)) { continue; }
+		for (int b = 0; b < GetBallNum(); ++b) {
+			if ((enemy_p[e].x < ball_p[b].x) && (enemy_p[e].x + BLOCK_SIZE > ball_p[b].x) && (enemy_p[e].y < ball_p[b].y) && (enemy_p[e].y + BLOCK_SIZE > ball_p[b].y)) {
+				int dam = GetRand(50)+1;
+				VECTOR pos;
+				pos.x = enemy_p[e].x + BLOCK_SIZE / 2;
+				pos.y = enemy_p[e].y - 20;
+				SetEnemyDamage(e, dam); //敵にダメージを設定
+				ball->SetBallFlag(b, true); //弾のフラグを設定
+				player->SetUseMP(1);        //MP消費
+				ShowDamage(pos, dam, GetColor(255,255,255)); //ダメージを表示
+			}
+		}
+	}
+	double px; double py;
+	player->GetPlayerPos(&px, &py);
+	for (int e = 0; e < enemy_num; ++e) {
+		if (enemy->GetDeathFlag(e)) { continue; }
+		if ((player->CheckContact(enemy_p[e], BLOCK_SIZE))&&(!player->GetDeathFlag())) {
+			int dam = GetRand(10) + 1;
+			player->SetDamage(dam);
+			VECTOR pos;
+			pos.x = px + BLOCK_SIZE / 2;
+			pos.y = py - 20;
+			ShowDamage(pos, dam, GetColor(255,0,0));
+		}
+	}
+}
+
+void CONTROL::AutoRecovery() {//自動回復処理
+	if (g_count % 60 == 0) {
+		player->AutoRecovery();//プレイヤーの自動回復
+		enemy->AutoRecovery();//敵の自動回復
+	}
+}
+
+bool CONTROL::GetGameOverFlag() {//ゲームオーバーフラグを取得
+	return gameover_flag;
+}
+
+void CONTROL::ScreenDark() {//死亡時に画面を徐々に暗くする
+	if (player_hp == 0) {++death_count;	}
+	if (death_count > 300) {gameover_flag = true;}
+}
+
+CONTROL::eGame CONTROL::GetGameMode() {//ゲームモードを取得
+	return game_mode;
+}
+
+void CONTROL::SetGameMode(CONTROL::eGame eg) {//ゲームモードを設定
+	game_mode = eg;
+}
+
+void CONTROL::ShowInfo() {//情報を表示
+	int mouse_x, mouse_y;      GetMousePos(&mouse_x, &mouse_y);
+	double player_x, player_y; GetPlayerPos(&player_x, &player_y);
+	int maxhp;             GetPlayerHP(&player_hp, &maxhp);
 	
-
-	FILE *fp;
-	ENEMYDATA data[ENEMY_NUM];
-	char buf[100];
-	int c;
-	int col = 1;
-	int row = 0;
-
-	memset(buf, 0, sizeof(buf));
-	fp = fopen("enemydata.csv", "r");
-
-	//ヘッダ読み飛ばし
-	while (fgetc(fp) != '\n');
-
-	while (1) {
-
-		while (1) {
-
-			c = fgetc(fp);
-
-			//末尾ならループを抜ける。
-			if (c == EOF)
-				goto out;
-
-			//カンマか改行でなければ、文字としてつなげる
-			if (c != ',' && c != '\n')
-				strcat(buf, (const char*)&c);
-			//カンマか改行ならループ抜ける。
-			else
-				break;
-		}
-		//ここに来たということは、1セル分の文字列が出来上がったということ
-		switch (col) {
-			//1列目は敵種類を表す。atoi関数で数値として代入。
-		case 1:	data[row].type = atoi(buf); break;
-			//2列目は弾種類。以降省略。
-		case 2: data[row].stype = atoi(buf); break;
-		case 3: data[row].m_pattern = atoi(buf); break;
-		case 4: data[row].s_pattern = atoi(buf); break;
-		case 5: data[row].in_time = atoi(buf); break;
-		case 6: data[row].stop_time = atoi(buf); break;
-		case 7: data[row].shot_time = atoi(buf); break;
-		case 8: data[row].out_time = atoi(buf); break;
-		case 9: data[row].x = atoi(buf); break;
-		case 10: data[row].y = atoi(buf); break;
-		case 11: data[row].speed = atoi(buf); break;
-		case 12: data[row].hp = atoi(buf); break;
-		case 13: data[row].item = atoi(buf); break;
-		}
-		//バッファを初期化
-		memset(buf, 0, sizeof(buf));
-		//列数を足す
-		++col;
-
-		//もし読み込んだ文字が改行だったら列数を初期化して行数を増やす
-		if (c == '\n') {
-			col = 1;
-			++row;
-		}
-	}
-out:
-
-	//敵クラス生成
-	for (int i = 0; i<ENEMY_NUM; ++i) {
-		/*
-		enemy[i] = new ENEMY(data[i].type, data[i].stype, data[i].m_pattern, data[i].s_pattern, data[i].in_time, data[i].stop_time, data[i].shot_time,
-			data[i].out_time, data[i].x, data[i].y, data[i].speed, data[i].hp, data[i].item);
-		*/
-	}
-
-	boss = new BOSS();
-	
-	//サウンドファイル読み込み
-	s_eshot = LoadSoundMem("enemyshot.mp3");
-	s_pshot = LoadSoundMem("playershot.mp3");
-	s_edead = LoadSoundMem("enemydead.mp3");
-	s_graze = LoadSoundMem("graze.mp3");
-	s_item = LoadSoundMem("item.mp3");
-
-	eshot_flag = false;
-	pshot_flag = false;
-	edead_flag = false;
-	pdead_flag = false;
-	graze_flag = false;
-	item_flag = false;
-
+	SetFontSize(13);
+	DrawFormatString(10, GAME_HEIGHT - 20, GetColor(255, 255, 255), "マウス位置: %d,%d", mouse_x, mouse_y);
+	DrawFormatString(180, GAME_HEIGHT - 20, GetColor(255, 255, 255), "プレイヤー位置: %d,%d", (int)player_x, (int)player_y);
+	DrawFormatString(380, GAME_HEIGHT - 20, GetColor(255, 255, 255), "HP: %d/%d", player_hp, maxhp);
+	DrawFormatString(480, GAME_HEIGHT - 20, GetColor(255, 255, 255), "弾: %d/%d", GetBallNum(), (int)PSHOT_NUM);
+	DrawFormatString(580, GAME_HEIGHT - 20, GetColor(255, 255, 255), "敵: %d/%d", GetEnemyNum(), enemy_num);
+	DrawFormatString(700, GAME_HEIGHT - 20, GetColor(255, 255, 255), "モード: %d", game_mode);
+	DrawFormatString(1600, GAME_HEIGHT - 20, GetColor(255, 255, 255), "フレーム: %d", g_count);
+	SetDrawBlendMode(DX_BLENDMODE_MULA, death_count);
+	DrawBox(0, 0, GAME_WIDTH, GAME_HEIGHT, GetColor(0, 0, 0), 1);//死亡時の画面暗転
+	SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 255);
 }
 
-void CONTROL::EnemyDeadEffect(double x, double y) {
-	//エフェクトセット
-	for (int z = 0; EFFECT_EDEADNUM; ++z) {
-		if (!effect_edead[z]->GetFlag()) {
-			effect_edead[z]->SetFlag(x, y);
-			break;
-		}
-	}
+void CONTROL::All(){
+	GetEnemyPos(&enemy_p); //敵座標の動的配列を取得
+	GetBallPos(&ball_p);   //弾座標の動的配列を取得
+	CheckAttackContact();  //攻撃の接触判定
+	back->All();           //背景処理
+	enemy->All();          //敵処理
+	ball->All();           //弾処理
+	player->All();         //プレイヤー処理
+	damage->All();         //ダメージ表示処理
+	ShowInfo();            //情報を表示
+	AutoRecovery();        //自動回復
+	ScreenDark();          //死亡時に画面を徐々に暗くする
 }
 
-void CONTROL::GetPlayerPosition(double *x, double *y) {
-	double tempx, tempy;
-	player->GetPosition(&tempx, &tempy);
-	*x = tempx;
-	*y = tempy;
-}
-
-bool CONTROL::GetBossFlag() {
-	return boss->GetFlag();
-}
-
-void CONTROL::GetBossPosition(double *x, double *y) {
-	double tempx, tempy;
-	boss->GetPosition(&tempx, &tempy);
-	*x = tempx;
-	*y = tempy;
-}
-
-bool CONTROL::GetEnemyPosition(int index, double *x, double *y) {
-	double tempx, tempy;
-	if (enemy[index] == NULL || enemy[index]->GetDeadFlag())
-		return false;
-
-	//指定した添字の敵の座標を取得
-	enemy[index]->GetPosition(&tempx, &tempy);
-	//代入
-	*x = tempx;
-	*y = tempy;
-	return true;
-}
-
-bool CONTROL::CircleCollision(double c1, double c2, double cx1, double cx2, double cy1, double cy2) {
-	double hlength = c1 + c2;
-	double xlength = cx1 - cx2;
-	double ylength = cy1 - cy2;
-	if (hlength * hlength >= xlength * xlength + ylength * ylength) {
-		return true;
-	}else {
-		return false;
-	}
-}
-
-void CONTROL::CollisionAll() {
-	double px, py, ex, ey;
-
-	bool tempflag =  false;
-	bool gtempflag = false;
-
-	//操作キャラの弾と敵の当たり判定
-	for (int i = 0; i < PSHOT_NUM; ++i) {
-		if (player->GetShotPosition(i, &px, &py)) {
-			for (int s = 0; s < ENEMY_NUM; ++s) {
-				//敵クラスのポインタがNULLじゃない、かつdeadflagがfalse(死んでない＆帰還してない)
-				if (enemy[s] != NULL && !enemy[s]->GetDeadFlag()) {
-					enemy[s]->GetPosition(&ex, &ey);
-					//当たり判定
-					if (CircleCollision(PSHOT_COLLISION, ENEMY1_COLLISION, px, ex, py, ey)) {
-						//当たっていれば、deadflagを立てる
-						enemy[s]->SetDeadFlag();
-						//当たった弾のフラグを戻す
-						player->SetShotFlag(i, false);
-						//敵消滅音フラグセット
-						edead_flag = true;
-						//敵消滅エフェクトセット
-						EnemyDeadEffect(ex, ey);
-						//得点を加える
-						score->SetScore(CURRENT_SCORE, 100);
-						//アイテム出現
-						for (int z = 0; z < ITEM_NUM; ++z) {
-							if (!item[z]->GetFlag()) {
-								item[z]->SetFlag(ex, ey, enemy[s]->GetItem());
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	//敵の弾と操作キャラとの当たり判定
-	//プレイヤーが生きていれば
-	if (!player->GetDamageFlag()) {
-		player->GetPosition(&px, &py);
-		for (int i = 0; i < ENEMY_NUM; ++i) {
-			if (enemy[i] != NULL) {
-				for (int s = 0; s < ENEMY_SNUM; ++s) {
-					//弾フラグが立っていればtrueを返す
-					if (enemy[i]->GetShotPosition(s, &ex, &ey)) {
-						//弾によって当たり判定が違うのでwsitch文で分岐
-						switch (enemy[i]->GetShotType()) {
-							case 0:
-								//グレイズ判定
-								if (CircleCollision(GRAZE_COLLISION, ESHOT0_COLLISION, px, ex, py, ey)) {
-									gtempflag = true;
-								}
-								//当たってれば
-								if (CircleCollision(PLAYER_COLLISION, ESHOT0_COLLISION, px, ex, py, ey)) {
-									tempflag = true;
-								}
-								break;
-							case 1:
-								if (CircleCollision(GRAZE_COLLISION, ESHOT1_COLLISION, px, ex, py, ey)) {
-									gtempflag = true;
-								}
-								if (CircleCollision(PLAYER_COLLISION, ESHOT1_COLLISION, px, ex, py, ey)) {
-									tempflag = true;
-								}
-								break;
-							case 2:
-								if (CircleCollision(GRAZE_COLLISION, ESHOT2_COLLISION, px, ex, py, ey)) {
-									gtempflag = true;
-								}
-								if (CircleCollision(PLAYER_COLLISION, ESHOT2_COLLISION, px, ex, py, ey)) {
-									tempflag = true;
-								}
-								break;
-						}
-						//グレイズ当たり判定がtrueなら
-						if (gtempflag) {
-							//まだ
-							if (!enemy[i]->GetGrazeFlag(s)) {
-								enemy[i]->SetGrazeFlag(s);
-								//グレイズのインスタンス検索
-								for (int z = 0; z < GRAZE_NUM; ++z) {
-									if (!graze[z]->GetFlag()) {
-										graze[z]->SetFlag(px, py);
-										break;
-									}
-								}
-								//グレイズの得点を加える
-								score->SetScore(GRAZE_SCORE, 1);
-								score->SetScore(CURRENT_SCORE, 20);
-								//グレイズ音セット
-								graze_flag = true;
-							}
-							gtempflag = false;
-						}
-						if (tempflag) {
-							//操作キャラのdamageflagを立てる
-							player->SetDamageFlag();
-							//弾を消す
-							enemy[i]->SetShotFlag(s, false);
-							//プレイヤー消滅音フラグを立てる
-							pdead_flag = true;
-							//一時フラグを戻す
-							tempflag = false;
-						}
-					}
-				}
-			}
-		}
-		
-		double ix, iy;
-		//アイテムとプレイヤーの当たり判定
-		for (int i = 0; i < ITEM_NUM; ++i) {
-			if (item[i]->GetFlag()) {
-				item[i]->GetPosition(&ix, &iy);
-				if (CircleCollision(PLAYER_COLLISION, ITEM_COLLISION, px, ix, py, iy)) {
-					switch (item[i]->GetType()) {
-						case 0:
-							score->SetScore(CURRENT_SCORE, 300);
-							break;
-						case 1:
-							player->SetPower(1);
-							score->SetScore(POWER_SCORE, player->GetPower());
-							//パワーを増やす
-							break;
-					}
-					item[i]->Delete();
-					//アイテム取得音をセット
-					item_flag = true;
-				}
-			}
-		}
-
-	}
-	//ライフは毎回取得
-	score->SetScore(LIFE_SCORE, player->GetLife());
-}
-
-void CONTROL::BossCollisionAll() {
-	double px, py, bx, by, ix, iy;
-	int bhp;
-	//出すアイテム数
-	int itemnum = 0;
-	//グレイズとヒットしたかのフラグ
-	bool hflag = false, gflag = false;
-	//ボスの弾の種類
-	int type;
-
-	//まず無敵フラグが立ってないかをチェック
-	if ((!boss->GetNodamageFlag()) && boss->GetFlag()) {
-		//プレイヤーのショットとボスの当たり判定
-		for (int i = 0; i < PSHOT_NUM; ++i) {
-			if (player->GetShotPosition(i, &px, &py)) {
-				boss->GetPosition(&bx, &by);
-				//当たり判定
-				if (CircleCollision(PSHOT_COLLISION, BOSS_COLLISION, px, bx, py, by)) {
-					//当たっていればhpを減らす
-					bhp = boss->HpSet(1);
-					//当たった弾のフラグを戻す
-					player->SetShotFlag(i, false);
-					//ボスのダメージ
-					boss->SetDamageFlag();
-					//得点を加える
-					score->SetScore(CURRENT_SCORE, 10);
-
-					char buf[100];
-					sprintf(buf, "%d", bhp);
-					SetMainWindowText(buf);
-
-					//ボスの前回HPが2/3以上で、現HPが2/3以下なら
-					if (BOSS_HP * 2 / 3 >= bhp && boss->GetPrevHp() > BOSS_HP * 2 / 3) {
-						//ダメージエフェクトを出す
-						EnemyDeadEffect(bx, by);
-						//ダメージ音を鳴らす
-						edead_flag = true;
-						//さらに得点を加える
-						score->SetScore(CURRENT_SCORE, 1000);
-						//アイテムを出す
-						for (int z = 0; z < ITEM_NUM; ++z) {
-							if (!item[z]->GetFlag()) {
-								//アイテムの初期座標をばらけさせる
-								ix = (rand() % 100 - 51) + bx;
-								iy = (rand() % 100 - 51) + by;
-								item[z]->SetFlag(ix, iy, rand() % 2);
-								++itemnum;
-								//5個出したらループを抜ける
-								if (itemnum == 5) {
-									break;
-								}
-							}
-							
-						}
-						boss->SetDamageSetting();
-						
-					} else if (BOSS_HP / 3 >= bhp && boss->GetPrevHp() > BOSS_HP / 3) {
-						//ダメージエフェクトを出す
-						EnemyDeadEffect(bx, by);
-						//ダメージ音を鳴らす
-						edead_flag = true;
-						//さらに得点を加える
-						score->SetScore(CURRENT_SCORE, 1000);
-						//アイテムを出す。
-						for (int z = 0; z < ITEM_NUM; ++z) {
-							if (!item[z]->GetFlag()) {
-								//アイテムの初期座標をばらけさせる
-								ix = (rand() % 100 - 51) + bx;
-								iy = (rand() % 100 - 51) + by;
-								item[z]->SetFlag(ix, iy, rand() % 2);
-								++itemnum;
-								//5個出したらループを抜ける
-								if (itemnum == 5) {
-									break;
-								}
-							}
-						}
-						boss->SetDamageSetting();
-					} else if (bhp <= 0) {
-						//フラグを戻す
-						boss->SetFlag(false);
-						//消滅エフェクトを出す
-						EnemyDeadEffect(bx, by);
-						//消滅音を鳴らす
-						edead_flag = true;
-						//さらに得点を加える
-						score->SetScore(CURRENT_SCORE, 10000);
-						//アイテムを出す
-						for (int z = 0; z < ITEM_NUM; ++z) {
-							if (!item[z]->GetFlag()) {
-								ix = (rand() % 100 - 51) + bx;
-								iy = (rand() % 100 - 51) + by;
-								item[z]->SetFlag(ix, iy, rand() % 2);
-								++itemnum;
-								//10個出したらループを抜ける
-								if (itemnum == 10) {
-									break;
-								}
-							}
-						}
-					}
-
-					//もしボスのHPが0以下なら
-					if (bhp <= 0) {
-						//フラグを戻す
-						boss->SetFlag(false);
-						//消滅エフェクトを出す
-						EnemyDeadEffect(bx, by);
-						//消滅音を鳴らす
-						edead_flag = true;
-						//さらに得点を加える
-						score->SetScore(CURRENT_SCORE, 10000);
-						//アイテムを出す
-						for (int z = 0; z < ITEM_NUM; ++z) {
-							if (!item[z]->GetFlag()) {
-								//アイテムの初期座標をばらけさせる
-								ix = (rand() % 100 - 51) + bx;
-								iy = (rand() % 100 - 51) + by;
-								item[z]->SetFlag(ix, iy, rand() % 2);
-								++itemnum;
-								//10個出たらループを抜ける
-								if (itemnum == 10) {
-									break;
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	//ボスのショットとプレイヤーの当たり判定
-	if (!player->GetDamageFlag()) {
-		player->GetPosition(&px, &py);
-		for (int i = 0; i < BOSS_SHOTNUM; ++i) {
-			if (boss->GetShotPosition(i, &bx, &by, &type)) {
-				switch (type) {
-					case 0:
-						if (CircleCollision(GRAZE_COLLISION, ESHOT0_COLLISION, px, bx, py, by)) {
-							gflag = true;
-						}
-						if (CircleCollision(PLAYER_COLLISION, ESHOT0_COLLISION, px, bx, py, by)) {
-							hflag = true;
-						}
-						break;
-					case 1:
-						if (CircleCollision(GRAZE_COLLISION, ESHOT1_COLLISION, px, bx, py, by)) {
-							gflag = true;
-						}
-						if (CircleCollision(PLAYER_COLLISION, ESHOT1_COLLISION, px, bx, py, by)) {
-							hflag = true;
-						}
-						break;
-					case 2:
-						if (CircleCollision(GRAZE_COLLISION, ESHOT2_COLLISION, px, bx, py, by)) {
-							gflag = true;
-						}
-						if (CircleCollision(PLAYER_COLLISION, ESHOT2_COLLISION, px, bx, py, by)) {
-							hflag = true;
-						}
-						break;
-				}
-				//グレイズフラグが立ってたら
-				if (gflag) {
-					//該当の弾がすでにグレイズしているかチェック
-					if (!boss->GetGrazeFlag(i)) {
-						boss->SetGrazeFlag(i);
-						//まだ使われてないグレイズエフェクトを探す
-						for (int z = 0; z < GRAZE_NUM; ++z) {
-							if (!graze[z]->GetFlag()) {
-								graze[z]->SetFlag(px, py);
-								break;
-							}
-						}
-						//グレイズの得点を加える
-						score->SetScore(GRAZE_SCORE, 1);
-						score->SetScore(CURRENT_SCORE, 20);
-						//グレイズ音セット
-						graze_flag = true;
-					}
-					//次の弾のグレイズをチェックするためのフラグを戻す。
-					gflag = false;
-				}
-				if (hflag) {
-					//操作キャラのdamageflagを立てる
-					player->SetDamageFlag();
-					//弾を消す
-					boss->SetShotFlag(i, false);
-					//プレイヤー消滅音フラグを立てる
-					pdead_flag = true;
-					//一時フラグを戻す
-					hflag = false;
-					//１つでも当たったらプレイヤーは消滅するので、
-					//他の弾をチェックする必要ないのでループを抜ける。
-					break;
-				}
-			}
-		}
-	}
-	
-	//アイテムとプレイヤーの当たり判定
-	for (int i = 0; i < ITEM_NUM; ++i) {
-		if (item[i]->GetFlag()) {
-			item[i]->GetPosition(&ix, &iy);
-			if (CircleCollision(PLAYER_COLLISION, ITEM_COLLISION, px, ix, py, iy)) {
-				switch (item[i]->GetType()) {
-					case 0:
-						score->SetScore(CURRENT_SCORE, 300);
-						break;
-					case 1:
-						player->SetPower(1);
-						score->SetScore(POWER_SCORE, player->GetPower());
-						//パワーを増やす
-						break;
-				}
-				item[i]->Delete();
-				//アイテム取得音をセット
-				item_flag = true;
-			}
-		}
-	}
-	//ライフは毎回取得
-	score->SetScore(LIFE_SCORE, player->GetLife());
-}
-
-void CONTROL::All()
-{
-	//サウンドフラグを初期化
-	eshot_flag = pshot_flag = edead_flag = pdead_flag = graze_flag = item_flag = false;
-		
-	//描画領域を指定
-	SetDrawArea(MARGIN, MARGIN, MARGIN + 380, MARGIN + 460);
-	
-	back->All();
-
-	//プレイヤークラスのAll関数実行
-	player->All();
-	
-	//プレイヤーショットサウンドフラグをチェック
-	if (player->GetShotSound()) {
-		pshot_flag = true;
-	}
-
-	for (int i = 0; i < ENEMY_NUM; ++i) {
-		if (enemy[i] != NULL) {
-			//敵ショットサウンドフラグチェック
-			if (enemy[i]->GetShotSound()) {
-				eshot_flag = true;
-			}
-			if (enemy[i]->All()) {
-				delete enemy[i];
-				enemy[i] = NULL;
-			}
-		}
-	}
-
-	if (boss->GetFlag()) {
-		boss->All();
-	}
-	
-	//敵ショットサウンドフラグチェック
-	if (boss->GetShotSound()) {
-		eshot_flag = true;
-	}
-
-	//当たり判定
-	CollisionAll();
-	BossCollisionAll();
-
-	//グレイズ描画
-	for (int i = 0; i < GRAZE_NUM; ++i) {
-		graze[i]->All();
-	}
-
-	//敵消滅エフェクト
-	for (int i = 0; i < EFFECT_EDEADNUM; ++i) {
-		if (effect_edead[i]->GetFlag()) {
-			effect_edead[i]->All();
-		}
-	}
-
-	//アイテム
-	for (int i = 0; i < ITEM_NUM; ++i) {
-		if (item[i]->GetFlag()) {
-			item[i]->All();
-		}
-	}
-
-	//描画領域を指定
-	SetDrawArea(0, 0, 640, 480);
-
-	//スコア
-	score->All();
-
-	SoundAll();
-	++g_count;
-}
-
-void CONTROL::SoundAll() {
-	if (pshot_flag) {
-		PlaySoundMem(s_pshot, DX_PLAYTYPE_BACK);
-	}
-	if (eshot_flag) {
-		PlaySoundMem(s_eshot, DX_PLAYTYPE_BACK);
-	}
-	if (edead_flag) {
-		PlaySoundMem(s_edead, DX_PLAYTYPE_BACK);
-	}
-	if (pdead_flag) {
-		PlaySoundMem(s_edead, DX_PLAYTYPE_BACK);
-	}
-	if (graze_flag) {
-		PlaySoundMem(s_graze, DX_PLAYTYPE_BACK);
-	}
-	if (item_flag) {
-		PlaySoundMem(s_item, DX_PLAYTYPE_BACK);
-	}
-}
-
-CONTROL::~CONTROL()
-{
-	delete player;
+void CONTROL::Finalize() {
+	back = NULL;
+	enemy = NULL;
+	player = NULL;
+	ball = NULL;
+	damage = NULL;
 	delete back;
-	for (int i = 0; i < ENEMY_NUM; ++i) {
-		if (enemy[i] != NULL) {
-			delete enemy[i];
-		}
-	}
-	delete boss;
-	for (int i = 0; i < EFFECT_EDEADNUM; ++i) {
-		delete effect_edead[i];
-	}
-	for (int i = 0; i < GRAZE_NUM; ++i) {
-		delete graze[i];
-	}
-	for (int i = 0; i < ITEM_NUM; ++i) {
-		delete item[i];
-	}
+	delete enemy;
+	delete player;
+	delete ball;
+	delete damage;
+}
 
+CONTROL::~CONTROL(){
+	Finalize();
 }
